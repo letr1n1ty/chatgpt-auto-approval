@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Approval Helper</title>
+<style>
+body{
+  margin:0;
+  width:320px;
+  background:#16161e;
+  color:#c0caf5;
+  font-family:system-ui;
+}
+.container{
+  padding:14px;
+}
+.title{
+  font-weight:700;
+  margin-bottom:10px;
+}
+.card{
+  background:rgba(22,22,30,0.7);
+  border:1px solid rgba(122,162,247,0.2);
+  border-radius:12px;
+  padding:10px;
+  margin-bottom:10px;
+}
+.btn{
+  width:100%;
+  background:#7aa2f7;
+  border:none;
+  padding:10px;
+  border-radius:10px;
+  color:#0f0f14;
+  font-weight:700;
+  cursor:pointer;
+}
+.toggle{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.small{
+  font-size:12px;
+  color:#a9b1d6;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="title">ChatGPT Approval</div>
+
+  <div class="card toggle">
+    <span>Auto Approve</span>
+    <input type="checkbox" id="auto" />
+  </div>
+
+  <button class="btn" id="open">Open Settings</button>
+  <div class="small">Tokyo Night Theme</div>
+</div>
+
+<script>
+const openBtn = document.getElementById('open');
+openBtn.onclick = () => chrome.runtime.openOptionsPage();
+
+const toggle = document.getElementById('auto');
+
+chrome.storage.local.get(['autoApprove'], (d) => {
+  toggle.checked = !!d.autoApprove;
+});
+
+toggle.addEventListener('change', () => {
+  chrome.storage.local.set({ autoApprove: toggle.checked });
+});
+</script>
+</body>
+</html>
