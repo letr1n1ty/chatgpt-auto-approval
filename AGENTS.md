@@ -34,6 +34,7 @@ The extension injects one approval scanner into ChatGPT pages:
 - Approval prompts are routed by detector priority: connector first, then MCP server, then API tool, then unknown review-only prompts.
 - Shared helpers under `shared/` provide defaults, settings storage, DOM traversal, robust clicking, and retry behavior.
 - Approval is only automatic when `autoApprove` is enabled and the detected target is present in the matching allowlist.
+- When `autoApprove` is disabled, the normal scan loop must clear badges/outlines and exit before collecting approval candidates.
 
 The relevant storage keys are:
 
@@ -69,6 +70,19 @@ ChatGPT UI markup can change. DOM detection should therefore use resilient signa
 - open shadow-root traversal when available
 
 Avoid selectors that depend on unstable generated class names.
+
+### Scan Scope
+
+The scanner must not treat app chrome as an approval surface.
+
+Normal approval detection should be limited to:
+
+- active conversation surfaces such as `main` or `[role="main"]`
+- semantic dialogs and modals
+- popovers
+- Radix dialog surfaces
+
+The scanner should explicitly ignore sidebar, navigation, history, and conversation-list regions. Sidebar conversation titles can contain words such as `GitHub`, `authorize`, or `allow`; these titles must never be treated as approval dialogs.
 
 ### Approval Routing
 
@@ -138,10 +152,11 @@ The project currently has no build step. Test manually with an unpacked extensio
 
 Recommended checks:
 
-- Auto-approve disabled: no prompt should be automatically approved.
+- Auto-approve disabled: no badge, outline, or automatic prompt detection should be shown.
 - Auto-approve enabled, item absent from allowlist: prompt should not be automatically approved.
 - Auto-approve enabled, item present in allowlist: prompt should be approved.
 - GitHub connector approval should be classified as a Connector, not as an MCP server or API tool.
+- Sidebar conversation titles containing words such as `GitHub`, `authorize`, or `allow` should be ignored.
 - Removing `GitHub` from `trustedConnectors` should prevent GitHub connector auto-approval.
 - Popup and options page should reflect the same stored settings.
 - Hidden/background tabs should schedule scans without relying only on `requestAnimationFrame`.
