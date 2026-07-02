@@ -1,5 +1,5 @@
-// Auto-approve ChatGPT GitHub connector permission dialogs when autoApprove is enabled.
-// This is intentionally isolated from the MCP approval logic so existing MCP behavior stays unchanged.
+// Auto-approve ChatGPT GitHub connector permission dialogs when autoApprove is enabled
+// and GitHub is present in the connector allowlist.
 
 const githubHandledDialogs = new WeakSet();
 const githubPendingDialogs = new WeakSet();
@@ -35,11 +35,17 @@ function isGithubElementVisible(el) {
   );
 }
 
+function hasTrustedGithubConnector(connectors) {
+  if (connectors === undefined) return true;
+  if (!Array.isArray(connectors)) return false;
+  return connectors.some(connector => String(connector).trim().toLowerCase() === "github");
+}
+
 async function isGithubAutoApproveEnabled() {
   try {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-      const data = await chrome.storage.local.get(["autoApprove"]);
-      return data.autoApprove === true;
+      const data = await chrome.storage.local.get(["autoApprove", "trustedConnectors"]);
+      return data.autoApprove === true && hasTrustedGithubConnector(data.trustedConnectors);
     }
   } catch (error) {
     console.error("[GitHub Approval Helper] Failed to read autoApprove setting:", error);
@@ -47,7 +53,7 @@ async function isGithubAutoApproveEnabled() {
 
   try {
     const fallback = JSON.parse(localStorage.getItem("mcp_approval_settings_fallback_v2") || "{}");
-    return fallback.autoApprove === true;
+    return fallback.autoApprove === true && hasTrustedGithubConnector(fallback.trustedConnectors);
   } catch {
     return false;
   }
@@ -59,7 +65,6 @@ function isGithubApprovalText(text) {
   const normalized = normalizeGithubText(text);
   const compact = normalized.replace(/\s+/g, "");
 
-  // Exact ChatGPT connector permission prompts observed in zh/English UI.
   if (compact.includes("允許chatgpt使用github")) return true;
   if (compact.includes("要允許chatgpt使用github嗎")) return true;
   if (normalized.includes("allow chatgpt to use github")) return true;
@@ -276,7 +281,7 @@ githubObserver.observe(document.documentElement, {
 
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === "local" && changes.autoApprove) throttleGithubScan();
+    if (namespace === "local" && (changes.autoApprove || changes.trustedConnectors)) throttleGithubScan();
   });
 }
 
