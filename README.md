@@ -6,8 +6,8 @@ It detects supported approval prompts, compares them against local allowlists, a
 
 ## Features
 
-- Detects ChatGPT approval dialogs for MCP tools and MCP servers
-- Detects ChatGPT GitHub connector authorization prompts
+- Detects ChatGPT approval dialogs for MCP tools, MCP servers, and connectors
+- Classifies approval prompts through a single prioritized scanner
 - Auto-approves only trusted items from user-managed allowlists
 - Provides a full options page for policy management
 - Provides a popup for quick configuration
@@ -19,9 +19,9 @@ It detects supported approval prompts, compares them against local allowlists, a
 
 | Type | Examples | Policy Key |
 | --- | --- | --- |
-| API Tools | `apply_patch`, `exec_command`, `git_status` | `trustedTools` |
+| Connectors | `GitHub`, `Google Drive`, `Notion` | `trustedConnectors` |
 | MCP Servers | `MCP Neverending Coding` | `trustedServers` |
-| Connectors | `GitHub` | `trustedConnectors` |
+| API Tools | `apply_patch`, `exec_command`, `git_status` | `trustedTools` |
 
 Auto-approval only happens when:
 
@@ -85,11 +85,11 @@ The stored settings use the following shape:
 
 ```text
 manifest.json       Extension manifest
-content.js          MCP and API tool approval handling
-github-approval.js  GitHub connector approval handling
+content.js          Single approval scanner, router, detectors, badge, and approval handling
 options.html        Full settings page
 options.js          Settings storage and allowlist management
 popup.html          Popup quick settings UI
+shared/             Shared defaults, storage, DOM, and click retry helpers
 icons/              Extension icons
 AGENTS.md           Maintenance guide for coding agents
 ```
@@ -107,8 +107,10 @@ Recommended manual test cases:
 - Add and remove MCP servers from the popup and options page.
 - Add and remove connectors from the popup and options page.
 - Confirm that settings persist after reopening the popup.
+- Confirm that GitHub connector approval is classified as a Connector, not as an MCP server or API tool.
 - Confirm that GitHub connector auto-approval stops when `GitHub` is removed from `trustedConnectors`.
 - Confirm that no prompt is automatically approved when `autoApprove` is disabled.
+- Confirm that background tabs still scan without depending only on `requestAnimationFrame`.
 
 ## Browser Compatibility
 
@@ -118,16 +120,16 @@ The extension targets Chromium-based browsers that support Manifest V3, includin
 
 ChatGPT UI changes can affect dialog detection. The extension therefore avoids generated CSS class selectors where possible and relies on visible text, accessible labels, semantic dialog hints, conservative DOM traversal, and approval-button proximity.
 
-Version `0.2.1` hardens approval handling against common ChatGPT web UI changes:
+Version `0.3.0` consolidates approval handling into one scanner:
 
-- Scans dialog, modal, popover, Radix dialog, and nearby button-parent containers instead of relying only on `role="dialog"` or `aria-modal="true"`.
-- Traverses open shadow roots and composed parents so approval controls remain detectable if ChatGPT changes the component boundary.
-- Recognizes broader approval wording, including `Allow`, `Approve`, `Authorize`, `Connect`, `Continue`, `Run`, and Traditional/Simplified Chinese equivalents.
-- Retries approval clicks until the dialog actually resolves instead of treating the first click attempt as success.
-- Sends pointer and mouse events, focuses the target, and scrolls it into view before calling the native click method.
-- Uses a MutationObserver plus a low-frequency interval scan to catch SPA state changes that do not always create new DOM nodes.
+- Uses a single `content.js` scanner instead of separate MCP/API and GitHub connector scanners.
+- Routes approval prompts by detector priority: Connector first, then MCP server, then API tool, then unknown review-only prompts.
+- Prevents `GitHub` from being misclassified as a generic `git` tool signal.
+- Keeps all approval types on the same retry and audit-log path.
+- Uses `MutationObserver` plus interval safety scans.
+- Uses `queueMicrotask` for hidden documents and `requestAnimationFrame` only for visible foreground scans, so background tabs do not depend exclusively on foreground rendering callbacks.
 
-New approval surfaces should be added with explicit matching logic and a matching allowlist policy.
+New approval surfaces should be added as explicit detector branches with a matching allowlist policy.
 
 ## License
 
