@@ -170,6 +170,47 @@ const saveToast = document.getElementById("save-toast");
 let currentSettings = getDefaultSettings();
 let toastTimeout;
 
+function installThemeScrollbars() {
+  if (document.getElementById("approval-helper-scrollbar-style")) return;
+
+  const style = document.createElement("style");
+  style.id = "approval-helper-scrollbar-style";
+  style.textContent = `
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(122, 162, 247, 0.72) rgba(22, 22, 30, 0.62);
+    }
+
+    *::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    *::-webkit-scrollbar-track {
+      background: rgba(22, 22, 30, 0.62);
+      border-radius: 999px;
+      box-shadow: inset 0 0 0 1px rgba(122, 162, 247, 0.08);
+    }
+
+    *::-webkit-scrollbar-thumb {
+      min-height: 36px;
+      border: 2px solid rgba(22, 22, 30, 0.72);
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--tn-blue), var(--tn-cyan));
+      box-shadow: 0 0 16px rgba(122, 162, 247, 0.18);
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, var(--tn-cyan), var(--tn-blue));
+    }
+
+    *::-webkit-scrollbar-corner {
+      background: var(--tn-bg-deep);
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function detectBrowserLanguage() {
   const languages = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || "en"];
 
@@ -377,6 +418,7 @@ function removeConnector(connectorName) {
   removeValue("trustedConnectors", connectorName, renderAllChips);
 }
 
+installThemeScrollbars();
 document.addEventListener("DOMContentLoaded", loadSettings);
 
 if (languageSelect) {
