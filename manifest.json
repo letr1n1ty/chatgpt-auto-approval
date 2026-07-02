@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT MCP Approval Helper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Highlight trusted MCP approval dialogs and auto-approve or provide a manual confirmation hotkey.",
   "permissions": ["storage"],
   "icons": {
@@ -22,7 +22,7 @@
         "https://chatgpt.com/*",
         "https://chat.openai.com/*"
       ],
-      "js": ["content.js"],
+      "js": ["content.js", "github-approval.js"],
       "run_at": "document_idle"
     }
   ],
