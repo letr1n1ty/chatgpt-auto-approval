@@ -114,9 +114,18 @@ Recommended manual test cases:
 
 The extension targets Chromium-based browsers that support Manifest V3, including Chrome and Microsoft Edge.
 
-## Limitations
+## Reliability Notes
 
-ChatGPT UI changes can affect dialog detection. The extension therefore avoids generated CSS class selectors where possible and relies on visible text, accessible labels, dialog roles, and conservative DOM traversal.
+ChatGPT UI changes can affect dialog detection. The extension therefore avoids generated CSS class selectors where possible and relies on visible text, accessible labels, semantic dialog hints, conservative DOM traversal, and approval-button proximity.
+
+Version `0.2.1` hardens approval handling against common ChatGPT web UI changes:
+
+- Scans dialog, modal, popover, Radix dialog, and nearby button-parent containers instead of relying only on `role="dialog"` or `aria-modal="true"`.
+- Traverses open shadow roots and composed parents so approval controls remain detectable if ChatGPT changes the component boundary.
+- Recognizes broader approval wording, including `Allow`, `Approve`, `Authorize`, `Connect`, `Continue`, `Run`, and Traditional/Simplified Chinese equivalents.
+- Retries approval clicks until the dialog actually resolves instead of treating the first click attempt as success.
+- Sends pointer and mouse events, focuses the target, and scrolls it into view before calling the native click method.
+- Uses a MutationObserver plus a low-frequency interval scan to catch SPA state changes that do not always create new DOM nodes.
 
 New approval surfaces should be added with explicit matching logic and a matching allowlist policy.
 
