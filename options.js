@@ -1,4 +1,3 @@
-// 預設信任的 API 工具清單
 const DEFAULT_TRUSTED_TOOLS = [
   "apply_patch",
   "exec_command",
@@ -12,13 +11,23 @@ const DEFAULT_TRUSTED_TOOLS = [
   "git_diff"
 ];
 
-// 預設信任的 MCP 伺服器清單
 const DEFAULT_TRUSTED_SERVERS = [
   "MCP Neverending Coding"
 ];
 
-// DOM 元素
+const DEFAULT_TRUSTED_CONNECTORS = [
+  "GitHub"
+];
+
+const STORAGE_KEYS = [
+  "autoApprove",
+  "trustedTools",
+  "trustedServers",
+  "trustedConnectors"
+];
+
 const autoApproveToggle = document.getElementById("auto-approve-toggle");
+
 const toolInput = document.getElementById("tool-input");
 const addToolBtn = document.getElementById("add-tool-btn");
 const chipsListTools = document.getElementById("chips-list-tools");
@@ -27,19 +36,40 @@ const serverInput = document.getElementById("server-input");
 const addServerBtn = document.getElementById("add-server-btn");
 const chipsListServers = document.getElementById("chips-list-servers");
 
+const connectorInput = document.getElementById("connector-input");
+const addConnectorBtn = document.getElementById("add-connector-btn");
+const chipsListConnectors = document.getElementById("chips-list-connectors");
+
 const resetBtn = document.getElementById("reset-btn");
 const saveToast = document.getElementById("save-toast");
 
-// 當前設定狀態
-let currentSettings = {
-  autoApprove: false,
-  trustedTools: [],
-  trustedServers: []
-};
-
-// 顯示 Toast 提示
+let currentSettings = getDefaultSettings();
 let toastTimeout;
+
+function getDefaultSettings() {
+  return {
+    autoApprove: false,
+    trustedTools: [...DEFAULT_TRUSTED_TOOLS],
+    trustedServers: [...DEFAULT_TRUSTED_SERVERS],
+    trustedConnectors: [...DEFAULT_TRUSTED_CONNECTORS]
+  };
+}
+
+function uniqueSortedValues(values) {
+  return Array.from(new Set((values || []).map(value => String(value).trim()).filter(Boolean)));
+}
+
+function normalizeSettings(settings) {
+  return {
+    autoApprove: settings.autoApprove === true,
+    trustedTools: uniqueSortedValues(settings.trustedTools !== undefined ? settings.trustedTools : DEFAULT_TRUSTED_TOOLS),
+    trustedServers: uniqueSortedValues(settings.trustedServers !== undefined ? settings.trustedServers : DEFAULT_TRUSTED_SERVERS),
+    trustedConnectors: uniqueSortedValues(settings.trustedConnectors !== undefined ? settings.trustedConnectors : DEFAULT_TRUSTED_CONNECTORS)
+  };
+}
+
 function showToast() {
+  if (!saveToast) return;
   clearTimeout(toastTimeout);
   saveToast.classList.add("show");
   toastTimeout = setTimeout(() => {
@@ -47,76 +77,67 @@ function showToast() {
   }, 2000);
 }
 
-// 渲染信任 API 工具的 Chips
-function renderToolChips() {
-  chipsListTools.innerHTML = "";
-  
-  if (currentSettings.trustedTools.length === 0) {
+function renderChips(container, values, removeHandler, emptyText) {
+  container.innerHTML = "";
+
+  if (!values.length) {
     const emptyMsg = document.createElement("div");
     emptyMsg.className = "empty-state";
-    emptyMsg.textContent = "目前沒有設定信任的 API 工具。";
-    chipsListTools.appendChild(emptyMsg);
+    emptyMsg.textContent = emptyText;
+    container.appendChild(emptyMsg);
     return;
   }
 
-  currentSettings.trustedTools.forEach(tool => {
+  values.forEach(value => {
     const chip = document.createElement("div");
     chip.className = "chip";
-    chip.textContent = tool;
 
-    const deleteBtn = document.createElement("span");
+    const label = document.createElement("span");
+    label.textContent = value;
+
+    const deleteBtn = document.createElement("button");
     deleteBtn.className = "chip-delete";
+    deleteBtn.type = "button";
+    deleteBtn.setAttribute("aria-label", `移除 ${value}`);
     deleteBtn.textContent = "×";
-    deleteBtn.addEventListener("click", () => removeTool(tool));
+    deleteBtn.addEventListener("click", () => removeHandler(value));
 
+    chip.appendChild(label);
     chip.appendChild(deleteBtn);
-    chipsListTools.appendChild(chip);
-  });
-}
-
-// 渲染信任 MCP 伺服器的 Chips
-function renderServerChips() {
-  chipsListServers.innerHTML = "";
-  
-  if (currentSettings.trustedServers.length === 0) {
-    const emptyMsg = document.createElement("div");
-    emptyMsg.className = "empty-state";
-    emptyMsg.textContent = "目前沒有設定信任的 MCP 伺服器。";
-    chipsListServers.appendChild(emptyMsg);
-    return;
-  }
-
-  currentSettings.trustedServers.forEach(server => {
-    const chip = document.createElement("div");
-    chip.className = "chip";
-    chip.textContent = server;
-
-    const deleteBtn = document.createElement("span");
-    deleteBtn.className = "chip-delete";
-    deleteBtn.textContent = "×";
-    deleteBtn.addEventListener("click", () => removeServer(server));
-
-    chip.appendChild(deleteBtn);
-    chipsListServers.appendChild(chip);
+    container.appendChild(chip);
   });
 }
 
 function renderAllChips() {
-  renderToolChips();
-  renderServerChips();
+  renderChips(
+    chipsListTools,
+    currentSettings.trustedTools,
+    removeTool,
+    "目前沒有設定信任的 API 工具。"
+  );
+
+  renderChips(
+    chipsListServers,
+    currentSettings.trustedServers,
+    removeServer,
+    "目前沒有設定信任的 MCP 伺服器。"
+  );
+
+  renderChips(
+    chipsListConnectors,
+    currentSettings.trustedConnectors,
+    removeConnector,
+    "目前沒有設定信任的 Connector。"
+  );
 }
 
-// 儲存設定至 chrome.storage
 async function saveSettings() {
+  currentSettings = normalizeSettings(currentSettings);
+
   try {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-      await chrome.storage.local.set({
-        autoApprove: currentSettings.autoApprove,
-        trustedTools: currentSettings.trustedTools,
-        trustedServers: currentSettings.trustedServers
-      });
+      await chrome.storage.local.set(currentSettings);
     } else {
-      // 供本地測試/無 extension 環境時的 fallback
       localStorage.setItem("mcp_approval_settings_fallback_v2", JSON.stringify(currentSettings));
     }
     showToast();
@@ -125,104 +146,97 @@ async function saveSettings() {
   }
 }
 
-// 載入設定
 async function loadSettings() {
   try {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-      const data = await chrome.storage.local.get(["autoApprove", "trustedTools", "trustedServers"]);
-      
-      currentSettings.autoApprove = data.autoApprove !== undefined ? data.autoApprove : false;
-      currentSettings.trustedTools = data.trustedTools !== undefined ? data.trustedTools : [...DEFAULT_TRUSTED_TOOLS];
-      currentSettings.trustedServers = data.trustedServers !== undefined ? data.trustedServers : [...DEFAULT_TRUSTED_SERVERS];
+      const data = await chrome.storage.local.get(STORAGE_KEYS);
+      currentSettings = normalizeSettings(data);
     } else {
-      // 本地測試 fallback
       const fallback = localStorage.getItem("mcp_approval_settings_fallback_v2");
-      if (fallback) {
-        currentSettings = JSON.parse(fallback);
-      } else {
-        currentSettings.autoApprove = false;
-        currentSettings.trustedTools = [...DEFAULT_TRUSTED_TOOLS];
-        currentSettings.trustedServers = [...DEFAULT_TRUSTED_SERVERS];
-      }
+      currentSettings = normalizeSettings(fallback ? JSON.parse(fallback) : getDefaultSettings());
     }
 
-    // 更新 UI
     autoApproveToggle.checked = currentSettings.autoApprove;
     renderAllChips();
   } catch (error) {
     console.error("載入設定失敗:", error);
+    currentSettings = getDefaultSettings();
+    renderAllChips();
   }
 }
 
-// 新增工具
+function addValue(input, listName, renderFn) {
+  const value = input.value.trim();
+  if (!value) return;
+
+  if (!currentSettings[listName].includes(value)) {
+    currentSettings[listName].push(value);
+    currentSettings[listName] = uniqueSortedValues(currentSettings[listName]);
+    renderFn();
+    saveSettings();
+  }
+
+  input.value = "";
+  input.focus();
+}
+
+function removeValue(listName, value, renderFn) {
+  currentSettings[listName] = currentSettings[listName].filter(item => item !== value);
+  renderFn();
+  saveSettings();
+}
+
 function addTool() {
-  const toolName = toolInput.value.trim();
-  if (!toolName) return;
-
-  if (!currentSettings.trustedTools.includes(toolName)) {
-    currentSettings.trustedTools.push(toolName);
-    renderToolChips();
-    saveSettings();
-  }
-  
-  toolInput.value = "";
-  toolInput.focus();
+  addValue(toolInput, "trustedTools", renderAllChips);
 }
 
-// 刪除工具
 function removeTool(toolName) {
-  currentSettings.trustedTools = currentSettings.trustedTools.filter(t => t !== toolName);
-  renderToolChips();
-  saveSettings();
+  removeValue("trustedTools", toolName, renderAllChips);
 }
 
-// 新增伺服器
 function addServer() {
-  const serverName = serverInput.value.trim();
-  if (!serverName) return;
-
-  if (!currentSettings.trustedServers.includes(serverName)) {
-    currentSettings.trustedServers.push(serverName);
-    renderServerChips();
-    saveSettings();
-  }
-  
-  serverInput.value = "";
-  serverInput.focus();
+  addValue(serverInput, "trustedServers", renderAllChips);
 }
 
-// 刪除伺服器
 function removeServer(serverName) {
-  currentSettings.trustedServers = currentSettings.trustedServers.filter(s => s !== serverName);
-  renderServerChips();
-  saveSettings();
+  removeValue("trustedServers", serverName, renderAllChips);
 }
 
-// 事件監聽
+function addConnector() {
+  addValue(connectorInput, "trustedConnectors", renderAllChips);
+}
+
+function removeConnector(connectorName) {
+  removeValue("trustedConnectors", connectorName, renderAllChips);
+}
+
 document.addEventListener("DOMContentLoaded", loadSettings);
 
-autoApproveToggle.addEventListener("change", (e) => {
-  currentSettings.autoApprove = e.target.checked;
+autoApproveToggle.addEventListener("change", event => {
+  currentSettings.autoApprove = event.target.checked;
   saveSettings();
 });
 
-// 工具事件
 addToolBtn.addEventListener("click", addTool);
-toolInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") addTool();
+toolInput.addEventListener("keydown", event => {
+  if (event.key === "Enter") addTool();
 });
 
-// 伺服器事件
 addServerBtn.addEventListener("click", addServer);
-serverInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") addServer();
+serverInput.addEventListener("keydown", event => {
+  if (event.key === "Enter") addServer();
+});
+
+addConnectorBtn.addEventListener("click", addConnector);
+connectorInput.addEventListener("keydown", event => {
+  if (event.key === "Enter") addConnector();
 });
 
 resetBtn.addEventListener("click", () => {
-  if (confirm("您確定要將信任工具與伺服器清單重設為預設值嗎？")) {
-    currentSettings.trustedTools = [...DEFAULT_TRUSTED_TOOLS];
-    currentSettings.trustedServers = [...DEFAULT_TRUSTED_SERVERS];
-    renderAllChips();
-    saveSettings();
-  }
+  if (!confirm("您確定要將所有信任清單重設為預設值嗎？")) return;
+
+  currentSettings = getDefaultSettings();
+  autoApproveToggle.checked = currentSettings.autoApprove;
+  renderAllChips();
+  saveSettings();
 });
