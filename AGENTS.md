@@ -1,29 +1,136 @@
 # AGENTS.md
 
-## Overview
-這是一個 Chrome Extension 專案，名為 `chatgpt-mcp-approval-helper`。
-主要功能是偵測 ChatGPT 網頁上的 MCP (Model Context Protocol) 授權彈窗，標示信任的工具並提供自動或快捷鍵核准功能，以提升開發效率並保留安全稽核日誌。
+## Project Overview
 
-## Structure
-- `/Users/sigi/.gemini/antigravity/scratch/chatgpt-mcp-approval-helper/`
-  - `manifest.json`: Extension 規格定義檔 (Manifest V3)
-  - `content.js`: 負責注入 ChatGPT 頁面，進行 DOM 偵測與自動/快捷鍵核准邏輯
-  - `options.html` / `options.js` (預計新增): 提供使用者管理信任工具清單與設定模式的設定頁面
-  - `AGENTS.md`: 本專案開發與維護指引
+ChatGPT Approval Helper is a Manifest V3 browser extension that assists with approval dialogs inside the ChatGPT web app. It detects supported permission prompts, highlights trusted requests, and can automatically approve requests that match user-managed allowlists.
 
-## Build, Run, and Test
-- 本專案為純前端 Chrome Extension，無須編譯步驟。
-- 測試方式：
-  1. 開啟 Chrome 瀏覽器，進入 `chrome://extensions`。
-  2. 開啟右上角「開發者模式 (Developer mode)」。
-  3. 點擊「載入未封裝項目 (Load unpacked)」，選擇專案目錄。
-  4. 開啟 ChatGPT 進行功能驗證。
+The extension currently supports three approval categories:
 
-## Development Conventions
-- 採用 **繁體中文** 撰寫說明與日誌（程式碼與變數除外）。
-- 遵守 Manifest V3 規範，避免使用 `eval()`，使用非同步 `async/await` 代替 Promise 鏈。
-- 修改 DOM 時使用強健的 selector，並考慮 ChatGPT 介面更新的相容性。
+- API tools, such as `apply_patch`, `exec_command`, and `git_status`
+- MCP servers, such as `MCP Neverending Coding`
+- ChatGPT connectors, currently including GitHub connector approval prompts
 
-## Notes and Risks
-- ChatGPT 的 DOM 結構（如彈窗、按鈕的 class 或文字）若發生重大更新，可能導致偵測失效，content.js 的 selector 需保持高可維護性與容錯設計。
-- 自動 Approve 功能若過度寬鬆，可能帶來安全風險。本 Extension 預設應以半自動（僅信任 allowlist 中的工具）為主。
+The project is intentionally small and client-side. It does not require a build step, a backend service, or external runtime dependencies.
+
+## Repository Structure
+
+```text
+.
+├── manifest.json          # Chrome extension manifest, Manifest V3
+├── content.js             # MCP and API tool approval detection and handling
+├── github-approval.js     # GitHub connector approval detection and handling
+├── options.html           # Full settings page
+├── options.js             # Shared settings logic for options and popup UI
+├── popup.html             # Extension popup quick settings UI
+├── icons/                 # Extension icons
+└── AGENTS.md              # Maintenance instructions for coding agents
+```
+
+## Runtime Model
+
+The extension injects content scripts into ChatGPT pages:
+
+- `content.js` scans the DOM for MCP and API tool approval dialogs.
+- `github-approval.js` scans the DOM for GitHub connector authorization dialogs.
+- Both scripts read policy from `chrome.storage.local`.
+- Approval is only automatic when `autoApprove` is enabled and the detected target is present in the corresponding allowlist.
+
+The relevant storage keys are:
+
+```js
+{
+  autoApprove: boolean,
+  trustedTools: string[],
+  trustedServers: string[],
+  trustedConnectors: string[]
+}
+```
+
+## Development Guidelines
+
+### General Principles
+
+- Keep the extension dependency-free unless there is a strong reason to add tooling.
+- Prefer small, readable JavaScript over framework-based abstractions.
+- Preserve Manifest V3 compatibility.
+- Avoid `eval`, remote code execution, dynamic script injection from remote sources, and unnecessary permissions.
+- Do not add broad host permissions unless they are required for a supported approval surface.
+- Keep all approval logic explicit and allowlist-driven.
+
+### DOM Detection
+
+ChatGPT UI markup can change. DOM detection should therefore use resilient signals:
+
+- visible dialog text
+- accessible labels
+- button text
+- `role="dialog"`
+- `aria-modal="true"`
+- conservative parent traversal from visible approval buttons
+
+Avoid selectors that depend on unstable generated class names.
+
+### Auto-Approval Rules
+
+Automatic approval must remain policy-gated:
+
+- API tool prompts must match `trustedTools`.
+- MCP server prompts must match `trustedServers`.
+- Connector prompts must match `trustedConnectors`.
+- Global auto-approval must require `autoApprove === true`.
+
+Do not introduce unconditional auto-click behavior.
+
+### UI Guidelines
+
+The options page and popup should remain visually consistent:
+
+- Tokyo Night-inspired dark color palette
+- iOS-style grouped settings layout
+- compact popup controls for the most common settings
+- full settings page for complete allowlist management
+
+When changing settings UI, update both `options.html` and `popup.html` if the same setting is exposed in both places.
+
+### Persistence
+
+Use `chrome.storage.local` as the source of truth inside the extension. LocalStorage fallbacks may exist only for local test environments where the Chrome extension APIs are unavailable.
+
+### Logging
+
+Approval logs may be stored locally for debugging and audit visibility. Logs must not be transmitted to external services.
+
+### Security Expectations
+
+This extension operates on permission dialogs. Changes should be reviewed carefully for overbroad approval behavior. When adding support for a new connector or prompt type, include a clearly scoped detection rule and a matching allowlist policy.
+
+## Manual Testing
+
+The project currently has no build step. Test manually with an unpacked extension:
+
+1. Open `chrome://extensions` or `edge://extensions`.
+2. Enable Developer mode.
+3. Click Load unpacked.
+4. Select the repository directory.
+5. Open ChatGPT.
+6. Trigger supported approval prompts.
+7. Verify both manual and auto-approval behavior.
+8. Verify options page and popup settings persist correctly.
+
+Recommended checks:
+
+- Auto-approve disabled: no prompt should be automatically approved.
+- Auto-approve enabled, item absent from allowlist: prompt should not be automatically approved.
+- Auto-approve enabled, item present in allowlist: prompt should be approved.
+- Removing `GitHub` from `trustedConnectors` should prevent GitHub connector auto-approval.
+- Popup and options page should reflect the same stored settings.
+
+## Release Notes
+
+When preparing a release, update:
+
+- `manifest.json` version
+- `README.md`, if user-facing behavior changed
+- this file, if maintenance rules changed
+
+Do not include personal workflow notes, local absolute paths, or user-specific configuration in repository documentation.
